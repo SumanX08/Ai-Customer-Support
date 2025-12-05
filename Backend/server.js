@@ -29,9 +29,6 @@ app.use("/uploads", express.static("uploads"));
 
 
 mongoose.connect(process.env.MONGO_URI)
-.then(()=>{
-    console.log("Connected")
-})
 .catch(err=>{console.error(err); process.exit(1);})
 
 app.listen(process.env.PORT||5000,()=>{

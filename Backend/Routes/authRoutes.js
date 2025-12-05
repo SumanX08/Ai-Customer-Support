@@ -34,7 +34,6 @@ router.post('/signup',async(req,res)=>{
         res.status(201).json({token,email:newUser.email,role:newUser.role,id:newUser._id});
 
     } catch (error){
-        console.error(error);
         res.status(500).json({ message: "Server error" });
     }
 })
@@ -64,7 +63,6 @@ router.post('/login',async(req,res)=>{
 
         res.status(200).json({token,user:{email:user.email,role:user.role,id:user._id}});
     } catch (error) {
-        console.error(error);
         res.status(500).json({ message: "Server error" });
         
     }

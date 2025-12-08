@@ -32,7 +32,6 @@ router.post("/", async (req, res) => {
 
     const trimmedMessage = message.trim();
 
-    // 1) find or create chat
     let chat;
     if (chatId) {
       chat = await Chat.findById(chatId);
@@ -45,7 +44,6 @@ router.post("/", async (req, res) => {
       await chat.save();
     }
 
-    // 2) save user message
     await Message.create({
       chatId: chat._id,
       senderId: userId,
@@ -53,7 +51,6 @@ router.post("/", async (req, res) => {
       role: "user",
     });
 
-    // 2.5) Handle simple greetings WITHOUT RAG / docs
     const isGreeting = /^(hi|hello|hey|hola|namaste|yo)\b/i.test(trimmedMessage);
     if (isGreeting) {
       const greetingReply =
@@ -72,11 +69,9 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // 3) fetch all documents
     const docs = await Document.find();
 
     if (!docs.length) {
-      // No docs at all, just answer generally
       const fallback = "I don’t see any help documents yet, but you can tell me your issue and I’ll still try to help.";
       await Message.create({
         chatId: chat._id,
@@ -87,24 +82,19 @@ router.post("/", async (req, res) => {
       return res.status(200).json({ chatId: chat._id, answer: fallback });
     }
 
-    // 4) score documents
     let scored = docs.map((d) => ({
       title: d.title || d.originalName,
       content: d.content || "",
       score: scoreDoc(d.content || "", trimmedMessage),
     }));
 
-    // keep only docs with score > 0
     scored = scored.filter((d) => d.score > 0);
 
-    // ❌ don't force all docs when none matched
-    // if (!scored.length) { ... }  <-- remove your old fallback here
+   
 
-    // sort and take top 3 (if any)
     scored.sort((a, b) => b.score - a.score);
     const topDocs = scored.slice(0, 3);
 
-    // 5) build context (may be empty)
     let context = "";
     if (topDocs.length) {
       context = topDocs
@@ -114,13 +104,11 @@ router.post("/", async (req, res) => {
         .join("\n");
     }
 
-    // safety: limit context length
     const MAX_CHARS = 9000;
     if (context.length > MAX_CHARS) {
       context = context.slice(0, MAX_CHARS);
     }
 
-    // 6) call Gemini
     const prompt = `
 You are a helpful, concise customer support assistant.
 
@@ -142,30 +130,36 @@ ${trimmedMessage}
     const result = await model.generateContent(prompt);
     const answer = result.response.text();
 
-    // 7) save assistant message
     await Message.create({
       chatId: chat._id,
-      senderId: null, // or some system id
+      senderId: null, 
       text: answer,
       role: "assistant",
     });
 
-    // 8) send response
     res.json({
       chatId: chat._id,
       answer,
     });
   } catch (error) {
-    console.log("GEMINI KEY?", process.env.GEMINI_API_KEY);
-    console.error("Error in /api/chat:", error?.response?.data || error);
-    if(error?.response?.status===429){
-      return res.status(429).json({ error: "Rate limit exceeded. Please try again later." });
-    }
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
+  console.error("Error in /api/chat:", error);
 
-// test route
+  if (error.status === 429) {
+    // quota / rate limit exceeded
+    return res.status(503).json({
+      success: false,
+      message:
+        "Our AI provider is currently over its request limit. Please try again later.",
+      code: "AI_QUOTA_EXCEEDED",
+    });
+  }
+
+  res.status(500).json({
+    success: false,
+    message: "Something went wrong while generating a response.",
+  });
+}});
+
 router.get("/test", async (req, res) => {
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });

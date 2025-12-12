@@ -9,7 +9,6 @@ dotenv.config();
 const router = express.Router();
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// simple keyword score
 const scoreDoc = (text, query) => {
   let score = 0;
   const words = query.toLowerCase().split(/\s+/);
@@ -145,7 +144,6 @@ ${trimmedMessage}
   console.error("Error in /api/chat:", error);
 
   if (error.status === 429) {
-    // quota / rate limit exceeded
     return res.status(503).json({
       success: false,
       message:

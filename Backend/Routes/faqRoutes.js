@@ -1,5 +1,5 @@
-import express from 'express';
-import Faq from '../Models/Faq.js';
+import express from 'express'
+import Faq from '../Models/Faq.js'
 
 
 const router=express.Router();
